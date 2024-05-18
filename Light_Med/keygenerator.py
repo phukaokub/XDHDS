@@ -11,7 +11,7 @@ def rsakeygenerator(): #For generating the key for a new section
     
 def symkeygenerator(name): #For regenerating the existed section key
     key = Fernet.generate_key()
-    with open('/home/user/Light_Med/Light_Med/Symkeys/{}_key.txt'.format(name),'wb') as file:
+    with open('/home/phukaokk/SIIT Project/HDIMS/Light_Med/Light_Med/Symkeys/{}_key.txt'.format(name),'wb') as file:
         file.write(key)
     return key
 # def re_adminkeygenerator(): #For regenerating the admin section key

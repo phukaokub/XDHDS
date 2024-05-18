@@ -38,7 +38,7 @@ def main():
    rv1 = rv[0:n//2] 
    rv2 = rv[n//2:]
 
-   with open('/home/user/Light_Med/LightMed/Symkeys/{}_key.txt'.format(rv1name),'wb') as file:
+   with open('/home/phukaokk/SIIT Project/HDIMS/Light_Med/LightMed/Symkeys/{}_key.txt'.format(rv1name),'wb') as file:
       file.write(rv1)
 
    symkey = base64.urlsafe_b64encode(rv) #Create SymKey From RV
