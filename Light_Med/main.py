@@ -64,7 +64,7 @@ def main():
    print("Fog CPABE Dec Time: " + str(cpabe_dec_time))
 
    #Check for equality
-   with open('/home/phukaokk/SIIT Project/HDIMS/Light_Med/LightMed/Symkeys/{}_key.txt'.format(rv1name),'rb') as file:
+   with open('/home/phukaokk/SIIT Project/HDIMS/Light_Med/Symkeys/{}_key.txt'.format(rv1name),'rb') as file:
        rv1dec = file.read()
    if (rv1 == rv1dec):
       print("Both are equal")
