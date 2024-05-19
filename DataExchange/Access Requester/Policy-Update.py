@@ -1,145 +1,144 @@
+from cryptography.fernet import Fernet
 import json
+import PyPDF2
 import subprocess
-import time
 import os
 import tempfile
-from statistics import mean
-from operator import xor
-from cryptography.fernet import Fernet
+import base64
 import random
-import string
-import os, subprocess,timeit, time, base64
-
-
+import timeit
+from google.cloud import storage
 
 # Define paths
 oldkey_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Data_Owner"
 cpabe_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/cpabe-0.11"
-base_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Access Requester"
+base_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Access_Requester"
 pub_key_path = os.path.join(oldkey_path, "pub_key")
 master_key_path = os.path.join(oldkey_path, "master_key")
 priv_key_dir = os.path.join(base_path, "cpabe_keys")
 
-# Function to decrypt the key using cpabe-dec
-def decrypt_key(encrypted_key_path, old_policy):
-    priv_key_path = os.path.join(priv_key_dir, f"proxy_priv_{old_policy}")
+# Download data.json from GCS before processing
+bucket_name = "hospital-a"
+object_name = "proxy-test.json"
+local_data_path = "proxy-test.json"
+
+def download_data_from_gcs(bucket_name, object_name, local_file_path):
+    """Downloads a file from Google Cloud Storage."""
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    blob = bucket.blob(object_name)
+    blob.download_to_filename(local_file_path)
+
+def decrypt_file(encrypted_content_base64, key):
+    f = Fernet(key)
+    encrypted_content = base64.b64decode(encrypted_content_base64.encode())
+    decrypted_content = f.decrypt(encrypted_content)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as file:
+        file.write(decrypted_content)
+        file.flush()
+        return file.name
+
+# Function to generate the private key using cpabe-keygen
+def generate_private_key(attributes, priv_name):
+    priv_key_path = os.path.join(priv_key_dir, priv_name)
     cpabe_keygen_path = os.path.join(cpabe_path, 'cpabe-keygen')
-    subprocess.run([cpabe_keygen_path, '-o', priv_key_path, pub_key_path, master_key_path, old_policy], check=True)
+    subprocess.run([cpabe_keygen_path, '-o', priv_key_path, pub_key_path, master_key_path] + attributes, check=True)
 
+    # Read the private key from the file
+    with open(priv_key_path, "rb") as f:
+        private_key = base64.b64encode(f.read()).decode("utf-8")
+
+    return private_key
+
+def decrypt_key(encrypted_key_base64, priv_key_name):
     cpabe_dec_path = os.path.join(cpabe_path, 'cpabe-dec')
-    decrypted_key_path = os.path.join(cpabe_path, "decrypted_key")
-    subprocess.run([cpabe_dec_path, '-k', pub_key_path, priv_key_path, encrypted_key_path, '-o', decrypted_key_path], check=True)
-
-    # Read the decrypted key from the file
+    encrypted_key_path = os.path.join(priv_key_dir, "encrypted_key.cpabe")
+    with open(encrypted_key_path, "wb") as f:
+        f.write(base64.b64decode(encrypted_key_base64))
+    decrypted_key_path = os.path.join(base_path, "decrypted_key")
+    priv_key_path = os.path.join(priv_key_dir, priv_key_name)
+    subprocess.run([cpabe_dec_path, pub_key_path, priv_key_path, encrypted_key_path, '-o', decrypted_key_path], check=True)
     with open(decrypted_key_path, "rb") as f:
         decrypted_key = f.read()
-
     return decrypted_key
- 
+
 def encrypt_key(key, policy):
-    cpabe_enc_path = os.path.join(cpabe_path, 'cpabe-enc')
-    encrypted_key_path = os.path.join(priv_key_dir, f"encrypted_key_{policy}.cpabe")
-    subprocess.run([cpabe_enc_path, '-k', pub_key_path, key, policy, '-o', encrypted_key_path], check=True)
-
-    return encrypted_key_path
-
-# Function to re-encrypt the key using cpabe-enc
-def re_encrypt_key(decrypted_key, new_policy):
-    # Write the decrypted key to a temporary file
     with tempfile.NamedTemporaryFile(delete=False) as temp_key_file:
-        temp_key_file.write(decrypted_key)
+        temp_key_file.write(key)
         temp_key_file.flush()
-
         cpabe_enc_path = os.path.join(cpabe_path, 'cpabe-enc')
-        re_encrypted_key_path = os.path.join(priv_key_dir, f"re_encrypted_key_{new_policy}.cpabe")
-        subprocess.run([cpabe_enc_path, '-k', pub_key_path, temp_key_file.name, new_policy, '-o', re_encrypted_key_path], check=True)
-
-        # Remove the temporary file
-        os.remove(temp_key_file.name)
-
-    return re_encrypted_key_path
+        encrypted_key_path = os.path.join(priv_key_dir, "reencrypted_key.cpabe")
+        subprocess.run([cpabe_enc_path, '-k', pub_key_path, temp_key_file.name, policy, '-o', encrypted_key_path], check=True)
+    with open(encrypted_key_path, "rb") as f:
+        encrypted_key = base64.b64encode(f.read()).decode("utf-8")
+    return encrypted_key
 
 def main():
+    download_data_from_gcs(bucket_name, object_name, local_data_path)
 
-   #Decrypt CP-ABE -> Cost Old Policy 
-   #Encrypt CP-ABE -> Cost New Policy  
+    # Load the symmetric key and encrypted file from the downloaded data.json
+    with open(local_data_path, "r") as file:
+        data = json.load(file)
 
-   rv1name = "test1"
-   numberOfNewPolicy = 20;
-   numberOfPolicy = 20;
-   
+    # Define the attributes required for decryption
+    attributes = ['developer', 'it_department']
 
+    # Generate the private key for the attributes
+    priv_name = 'AR_priv'
+    generate_private_key(attributes, priv_name)
 
-   dataSizeInKb = 1000;
+    decryption_times = []
+    reencryption_times = []
 
-   policy = createPolicy(numberOfPolicy)
-   newPolicy = createPolicy(numberOfNewPolicy)
+   #  for index, entry in enumerate(data[:10]):  # Start with processing 10 entries for the test
+   #      encrypted_content_base64 = entry["files"][0]["CT_1"]
+   #      encrypted_key_base64 = entry["files"][0]["CT_2"]
 
-   #Key Creation
-   #policyForKey = createPolicyKey(numberOfPolicy)
-   #print(policyForKey)
+   #      # Decrypt the symmetric key using CP-ABE
+   #      start_time = timeit.default_timer()
+   #      decrypted_key = decrypt_key(encrypted_key_base64, priv_name)
+   #      stop_time = timeit.default_timer()
+   #      decryption_time = stop_time - start_time
+   #      decryption_times.append(decryption_time)
 
-   cpabe_keyName = "TEST"
+   #      # Decrypt the PDF file
+   #      decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_key)
 
-   data = createData(dataSizeInKb) #Create Data
-   byte_data = data.encode('utf-8') #Convert to bytes
-   rv = os.urandom(32) #Create RV
+   #      # Save the decrypted PDF file to the local machine
+   #      with open(decrypted_file_path, "rb") as file:
+   #          with open(f"decrypted_{index}.pdf", "wb") as decrypted:
+   #              decrypted.write(file.read())
 
-   n = len(rv) # Split RV into 2
-   rv1 = rv[0:n//2] 
-   rv2 = rv[n//2:]
+   #      # Open the decrypted PDF file
+   #      with open(f"decrypted_{index}.pdf", "rb") as file:
+   #          pdf_reader = PyPDF2.PdfReader(file)
+   #          print(f"PDF {index} metadata:", pdf_reader.metadata)
 
-   with open('/home/phukaokk/SIIT Project/HDIMS/Light_Med/Symkeys/{}_key.txt'.format(rv1name),'wb') as file:
-      file.write(rv1)
+   #      # Re-encrypt the symmetric key with a new random policy
+   #      new_policy = f"({random.choice(['admin', 'user'])} and it_department) or (developer and {random.choice(['finance', 'hr'])})"
+   #      start_reenc_time = timeit.default_timer()
+   #      re_encrypted_key = encrypt_key(decrypted_key, new_policy)
+   #      stop_reenc_time = timeit.default_timer()
+   #      reenc_time = stop_reenc_time - start_reenc_time
+   #      reencryption_times.append(reenc_time)
 
-   symkey = base64.urlsafe_b64encode(rv) #Create SymKey From RV
-   
-   start_sym_time = timeit.default_timer()
-   ct_m = Fernet(symkey).encrypt(byte_data) #Symmetric Encryption
-   stop_sym_time = timeit.default_timer()
+   #      # Decrypt the re-encrypted symmetric key to verify the process
+   #      new_priv_name = 'AR_repriv'
+   #      new_attributes = ['admin', 'it_department']
+   #      generate_private_key(new_attributes, new_priv_name)
+   #      start_redec_time = timeit.default_timer()
+   #      decrypted_reencrypted_key = decrypt_key(re_encrypted_key, new_priv_name)
+   #      stop_redec_time = timeit.default_timer()
+   #      redecryption_time = stop_redec_time - start_redec_time
 
-   sym_time = stop_sym_time - start_sym_time #Timer
+   #      # Verify the re-encryption process
+   #      assert decrypted_key == decrypted_reencrypted_key, f"Re-encryption process failed for index {index}. Keys do not match."
 
-   start_sym_dec_time = timeit.default_timer()
-   m = Fernet(symkey).decrypt(ct_m) #Symmetric Decryption
-   stop_sym_dec_time = timeit.default_timer()
+   #      print(f"Re-encryption Time for index {index}: {reenc_time} seconds")
+   #      print(f"Re-decryption Time for index {index}: {redecryption_time} seconds")
 
-   sym_dec_time = stop_sym_dec_time - start_sym_dec_time #Timer
-   
-   start_cpabe_time = timeit.default_timer()
-   encrypt_key(rv1name, policy) #CPABE Encryption
-   stop_cpabe_time = timeit.default_timer()
+    print(f"Average Decryption Time: {sum(decryption_times) / len(decryption_times)} seconds")
+    print(f"Average Re-encryption Time: {sum(reencryption_times) / len(reencryption_times)} seconds")
 
-   cpabe_time = stop_cpabe_time - start_cpabe_time #Timer
-
-   start_cpabe_time = timeit.default_timer()
-   start_cpabe_dec_time = timeit.default_timer()
-   decrypt_key(rv1name, cpabe_keyName) #CPABE Decryption
-   stop_cpabe_dec_time = timeit.default_timer()
-
-   re_encrypt_key(rv1name, newPolicy) #CPABE Reencryption
-   stop_cpabe_time = timeit.default_timer()
-
-   cpabe_time = stop_cpabe_time - start_cpabe_time #Timer
-   print("ReEnc Time: " + str(cpabe_time))
-   
-
-
-      
-def createData(size):
-   n = 1024 * size   # 1024 = 1 Kb of text
-   return ''.join([random.choice(string.ascii_lowercase) for i in range(n)])
-
-def createPolicy(amount):
-   policies = ""
-   for x in range(1, amount):
-      policies = policies + "TEST" + str(x) +  " and "
-   return policies + "TEST"+str(amount)
-
-def createPolicyKey(amount):
-   policies = ""
-   for x in range(1, amount):
-      policies = policies + "TEST" + str(x) +  " "
-   return policies + "TEST"+str(amount)
-   
-main()
+if __name__ == "__main__":
+    main()
