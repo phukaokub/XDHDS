@@ -54,12 +54,13 @@ def generate_private_key(attributes, priv_name):
         private_key = base64.b64encode(f.read()).decode("utf-8")
     return private_key
 
-def decrypt_key(encrypted_key_base64, priv_key_name):
+def decrypt_key(encrypted_key_base64, priv_key_name, index):
     cpabe_dec_path = os.path.join(cpabe_path, 'cpabe-dec')
     encrypted_key_path = os.path.join(priv_key_dir, "encrypted_key.cpabe")
     with open(encrypted_key_path, "wb") as f:
         f.write(base64.b64decode(encrypted_key_base64))
-    decrypted_key_path = os.path.join(base_path, "decrypted_key")
+    decrypted_key_name = str(index) + "decrypted_key"
+    decrypted_key_path = os.path.join(base_path, decrypted_key_name)
     priv_key_path = os.path.join(priv_key_dir, priv_key_name)
     result = subprocess.run(
         [cpabe_dec_path, pub_key_path, priv_key_path, encrypted_key_path, '-o', decrypted_key_path, '-k'],
@@ -67,18 +68,41 @@ def decrypt_key(encrypted_key_base64, priv_key_name):
         text=True
     )
     if result.returncode != 0:
-        print(f"Error decrypting key 70: {result.stderr}")
+        print(f"Error decrypting key 74 {index+proxy_id*chunk_size}: {result.stderr}")
+        print("+++++++++")
+        raise subprocess.CalledProcessError(result.returncode, result.args, output=result.stdout, stderr=result.stderr)
+    with open(decrypted_key_path, "rb") as f:
+        decrypted_key = f.read()
+        
+    return decrypted_key
+
+def redecrypt_key(encrypted_key_base64, repriv_key_name):
+    cpabe_dec_path = os.path.join(cpabe_path, 'cpabe-dec')
+    reencryptkey_name = repriv_key_name + "reencrypted_key.cpabe"
+    encrypted_key_path = os.path.join(priv_key_dir, reencryptkey_name)
+    with open(encrypted_key_path, "wb") as f:
+        f.write(base64.b64decode(encrypted_key_base64))
+    decrypted_key_path = os.path.join(base_path, "redecrypted_key")
+    priv_key_path = os.path.join(priv_key_dir, repriv_key_name)
+    result = subprocess.run(
+        [cpabe_dec_path, pub_key_path, priv_key_path, encrypted_key_path, '-o', decrypted_key_path, '-k'],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        print(f"Error decrypting key 96 {index+proxy_id*chunk_size}: {result.stderr}")
         raise subprocess.CalledProcessError(result.returncode, result.args, output=result.stdout, stderr=result.stderr)
     with open(decrypted_key_path, "rb") as f:
         decrypted_key = f.read()
     return decrypted_key
 
-def encrypt_key(key, policy):
+def encrypt_key(key, policy, priv_name):
     with tempfile.NamedTemporaryFile(delete=False) as temp_key_file:
         temp_key_file.write(key)
         temp_key_file.flush()
         cpabe_enc_path = os.path.join(cpabe_path, 'cpabe-enc')
-        encrypted_key_path = os.path.join(priv_key_dir, "reencrypted_key.cpabe")
+        encrypted_key_name = priv_name + "reencrypted_key.cpabe"
+        encrypted_key_path = os.path.join(priv_key_dir, encrypted_key_name)
         result = subprocess.run(
             [cpabe_enc_path, '-k', pub_key_path, temp_key_file.name, policy, '-o', encrypted_key_path],
             capture_output=True,
@@ -92,21 +116,35 @@ def encrypt_key(key, policy):
     return encrypted_key
 
 def reencrypt_entry(entry, reencryption_total_time, proxy_id, index):
+    # Decrypt the key by proxy
     encrypted_content_base64 = entry["files"][0]["CT_1"]
     encrypted_key_base64 = entry["files"][0]["CT_2"]
 
     start_time = timeit.default_timer()
     try:
-        decrypted_key = decrypt_key(encrypted_key_base64, priv_name)
+        decrypted_key = decrypt_key(encrypted_key_base64, priv_name, index)
     except subprocess.CalledProcessError as e:
-        print(f"Error decrypting key 102: {e}")
+        print(f"Error decrypting key 130 {index+proxy_id*chunk_size}: {e}")
         return
 
     stop_time = timeit.default_timer()
     decryption_time = stop_time - start_time
 
-    decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_key)
+    # Use a random AR policy that matches the attributes
+    start_reenc_time = timeit.default_timer()
+    
+    print("proxy id: ", proxy_id, "Index: ", index)
+    
+    new_priv_name = 'AR_repriv'+str(proxy_id*chunk_size+index)
+    new_attributes = ['admin', 'it_department']
+    generate_private_key(new_attributes, new_priv_name)
+    new_policy = "(admin and it_department) or (developer and finance)"
+    re_encrypted_key = encrypt_key(decrypted_key, new_policy, new_priv_name)
+    redecrypt_key(re_encrypted_key, new_priv_name)
 
+    # Decrypt the file by decrypted reencrypted key
+    decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_key)
+    
     with open(decrypted_file_path, "rb") as file:
         with open(f"decrypted_{index}.pdf", "wb") as decrypted:
             decrypted.write(file.read())
@@ -114,24 +152,13 @@ def reencrypt_entry(entry, reencryption_total_time, proxy_id, index):
     with open(decrypted_file_path, "rb") as decrypted:
         pdf_reader = PyPDF2.PdfReader(decrypted)
         print(f"PDF {index} metadata:", pdf_reader.metadata)
-
-    # Use a fixed policy that matches the attributes
-    new_policy = "(admin and it_department) or (developer and finance)"
-    start_reenc_time = timeit.default_timer()
-    re_encrypted_key = encrypt_key(decrypted_key, new_policy)
+        
     stop_reenc_time = timeit.default_timer()
     reenc_time = stop_reenc_time - start_reenc_time
-
-    new_priv_name = 'AR_repriv'
-    new_attributes = ['admin', 'it_department']
-    generate_private_key(new_attributes, new_priv_name)
-    start_redec_time = timeit.default_timer()
-    decrypted_reencrypted_key = decrypt_key(re_encrypted_key, new_priv_name)
-    stop_redec_time = timeit.default_timer()
-    redecryption_time = stop_redec_time - start_redec_time
-
+    
     # Accumulate the total re-encryption time
-    reencryption_total_time += (decryption_time + reenc_time + redecryption_time)
+    reencryption_total_time += (decryption_time + reenc_time)
+    
     # Print re-encryption time for the current entry
     print(f"Re-encryption Time for entry {index}: {reencryption_total_time} seconds")
 
@@ -150,7 +177,7 @@ with open(local_data_path, "r") as file:
     data = json.load(file)
 
 attributes = ['developer', 'it_department']
-priv_name = 'AR_priv'
+priv_name = 'Proxy'
 generate_private_key(attributes, priv_name)
 
 reencryption_total_time = 0  # Initialize total re-encryption time
@@ -160,15 +187,17 @@ print("1. Perform re-encryption sequentially")
 print("2. Perform re-encryption in parallel")
 
 choice = input("Enter your choice: ")
+data_num = len(data)
+proxy_num = 5
+chunk_size = ceil(data_num / proxy_num)
 
 if choice == "1":
-    for index, entry in enumerate(data[:100]):
+    for index, entry in enumerate(data[:data_num]):
         reencryption_total_time = reencrypt_entry(entry, reencryption_total_time, None, index)
 
 elif choice == "2":
     # Split the data into 5 chunks
-    chunk_size = ceil(len(data[:100]) / 20)
-    chunks = [data[:100][i:i+chunk_size] for i in range(0, len(data[:100]), chunk_size)]
+    chunks = [data[:data_num][i:i+chunk_size] for i in range(0, len(data[:data_num]), chunk_size)]
 
     # Create a list of futures
     futures = []
@@ -176,7 +205,7 @@ elif choice == "2":
         for proxy_id, chunk in enumerate(chunks):
             for index, entry in enumerate(chunk):
                 futures.append(executor.submit(reencrypt_entry, entry, reencryption_total_time, proxy_id, index+proxy_id*chunk_size))
-                print(f"Re-encryption task for entry {index+proxy_id*chunk_size} in chunk {proxy_id} submitted")
+                print(f"Re-encryption task for entry {index+proxy_id*chunk_size} in proxy {proxy_id} submitted")
 
     # Collect the results
     for future in concurrent.futures.as_completed(futures):
