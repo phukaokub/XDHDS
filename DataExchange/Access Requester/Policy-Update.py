@@ -90,52 +90,52 @@ def main():
     decryption_times = []
     reencryption_times = []
 
-   #  for index, entry in enumerate(data[:10]):  # Start with processing 10 entries for the test
-   #      encrypted_content_base64 = entry["files"][0]["CT_1"]
-   #      encrypted_key_base64 = entry["files"][0]["CT_2"]
+    for index, entry in enumerate(data[:10]):  # Start with processing 10 entries for the test
+        encrypted_content_base64 = entry["files"][0]["CT_1"]
+        encrypted_key_base64 = entry["files"][0]["CT_2"]
 
-   #      # Decrypt the symmetric key using CP-ABE
-   #      start_time = timeit.default_timer()
-   #      decrypted_key = decrypt_key(encrypted_key_base64, priv_name)
-   #      stop_time = timeit.default_timer()
-   #      decryption_time = stop_time - start_time
-   #      decryption_times.append(decryption_time)
+        # Decrypt the symmetric key using CP-ABE
+        start_time = timeit.default_timer()
+        decrypted_key = decrypt_key(encrypted_key_base64, priv_name)
+        stop_time = timeit.default_timer()
+        decryption_time = stop_time - start_time
+        decryption_times.append(decryption_time)
 
-   #      # Decrypt the PDF file
-   #      decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_key)
+        # Decrypt the PDF file
+        decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_key)
 
-   #      # Save the decrypted PDF file to the local machine
-   #      with open(decrypted_file_path, "rb") as file:
-   #          with open(f"decrypted_{index}.pdf", "wb") as decrypted:
-   #              decrypted.write(file.read())
+        # Save the decrypted PDF file to the local machine
+        with open(decrypted_file_path, "rb") as file:
+            with open(f"decrypted_{index}.pdf", "wb") as decrypted:
+                decrypted.write(file.read())
 
-   #      # Open the decrypted PDF file
-   #      with open(f"decrypted_{index}.pdf", "rb") as file:
-   #          pdf_reader = PyPDF2.PdfReader(file)
-   #          print(f"PDF {index} metadata:", pdf_reader.metadata)
+        # Open the decrypted PDF file
+        with open(f"decrypted_{index}.pdf", "rb") as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            print(f"PDF {index} metadata:", pdf_reader.metadata)
 
-   #      # Re-encrypt the symmetric key with a new random policy
-   #      new_policy = f"({random.choice(['admin', 'user'])} and it_department) or (developer and {random.choice(['finance', 'hr'])})"
-   #      start_reenc_time = timeit.default_timer()
-   #      re_encrypted_key = encrypt_key(decrypted_key, new_policy)
-   #      stop_reenc_time = timeit.default_timer()
-   #      reenc_time = stop_reenc_time - start_reenc_time
-   #      reencryption_times.append(reenc_time)
+        # Re-encrypt the symmetric key with a new random policy
+        new_policy = f"({random.choice(['admin', 'user'])} and it_department) or (developer and {random.choice(['finance', 'hr'])})"
+        start_reenc_time = timeit.default_timer()
+        re_encrypted_key = encrypt_key(decrypted_key, new_policy)
+        stop_reenc_time = timeit.default_timer()
+        reenc_time = stop_reenc_time - start_reenc_time
+        reencryption_times.append(reenc_time)
 
-   #      # Decrypt the re-encrypted symmetric key to verify the process
-   #      new_priv_name = 'AR_repriv'
-   #      new_attributes = ['admin', 'it_department']
-   #      generate_private_key(new_attributes, new_priv_name)
-   #      start_redec_time = timeit.default_timer()
-   #      decrypted_reencrypted_key = decrypt_key(re_encrypted_key, new_priv_name)
-   #      stop_redec_time = timeit.default_timer()
-   #      redecryption_time = stop_redec_time - start_redec_time
+        # Decrypt the re-encrypted symmetric key to verify the process
+        new_priv_name = 'AR_repriv'
+        new_attributes = ['admin', 'it_department']
+        generate_private_key(new_attributes, new_priv_name)
+        start_redec_time = timeit.default_timer()
+        decrypted_reencrypted_key = decrypt_key(re_encrypted_key, new_priv_name)
+        stop_redec_time = timeit.default_timer()
+        redecryption_time = stop_redec_time - start_redec_time
 
-   #      # Verify the re-encryption process
-   #      assert decrypted_key == decrypted_reencrypted_key, f"Re-encryption process failed for index {index}. Keys do not match."
+        # Verify the re-encryption process
+        assert decrypted_key == decrypted_reencrypted_key, f"Re-encryption process failed for index {index}. Keys do not match."
 
-   #      print(f"Re-encryption Time for index {index}: {reenc_time} seconds")
-   #      print(f"Re-decryption Time for index {index}: {redecryption_time} seconds")
+        print(f"Re-encryption Time for index {index}: {reenc_time} seconds")
+        print(f"Re-decryption Time for index {index}: {redecryption_time} seconds")
 
     print(f"Average Decryption Time: {sum(decryption_times) / len(decryption_times)} seconds")
     print(f"Average Re-encryption Time: {sum(reencryption_times) / len(reencryption_times)} seconds")

@@ -53,7 +53,7 @@ def generate_private_key(attributes, priv_name):
     return private_key
 
 # Function to encrypt the symmetric key using cpabe-enc
-def encrypt_key(key, policy):
+def encrypt_key(key, policy, priv_name):
     if isinstance(key, list) and len(key) == 1:
         key = key[0]
 
@@ -63,7 +63,7 @@ def encrypt_key(key, policy):
         temp_key_file.flush()
 
         cpabe_enc_path = os.path.join(cpabe_path, 'cpabe-enc')
-        encrypted_key_filename = "encrypted_key.cpabe"
+        encrypted_key_filename = priv_name + ".cpabe"
         encrypted_key_path = os.path.join(priv_key_dir, encrypted_key_filename)
         subprocess.run([cpabe_enc_path, '-k', pub_key_path, temp_key_file.name, policy, '-o', encrypted_key_path], check=True)
 
@@ -122,7 +122,7 @@ for i in range(1, 21):
 
     # Encrypt the symmetric key using CP-ABE
     policy = "(admin and it_department) or (developer and it_department)"
-    encrypted_key = encrypt_key(key.decode(), policy)
+    encrypted_key = encrypt_key(key.decode(), policy, priv_name)
 
     # Create a dictionary to store the encrypted file and the symmetric key
     file_data = {
