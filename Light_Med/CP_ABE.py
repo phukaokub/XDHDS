@@ -16,6 +16,7 @@ John Bethencourt, Brent Waters (Pairing-based)
 from charm.toolbox.pairinggroup import PairingGroup,ZR,G1,G2,GT,pair
 from charm.toolbox.secretutil import SecretUtil
 from charm.toolbox.ABEnc import ABEnc, Input, Output
+import pickle
 
 # type annotations
 pk_t = { 'g':G1, 'g2':G2, 'h':G1, 'f':G1, 'e_gg_alpha':GT }
@@ -47,18 +48,29 @@ class CPabe_BSW07(ABEnc):
         group = groupObj
 
     @Output(pk_t, mk_t)    
-    def setup(self):
-        g, gp = group.random(G1), group.random(G2)
-        alpha, beta = group.random(ZR), group.random(ZR)
-        # initialize pre-processing for generators
-        g.initPP(); gp.initPP()
-        
-        h = g ** beta; f = g ** ~beta
+    def setup():
+        group = PairingGroup('SS512')
+
+        g = group.random(G1)
+        gp = group.random(G2)
+        alpha = group.random(ZR)
+        beta = group.random(ZR)
+
+        g.initPP()
+        gp.initPP()
+
+        h = g ** beta
+        f = g ** ~beta
         e_gg_alpha = pair(g, gp ** alpha)
-        
-        pk = { 'g':g, 'g2':gp, 'h':h, 'f':f, 'e_gg_alpha':e_gg_alpha }
-        mk = {'beta':beta, 'g2_alpha':gp ** alpha }
-        return (pk, mk)
+
+        pk = {'g': g, 'g2': gp, 'h': h, 'f': f, 'e_gg_alpha': e_gg_alpha}
+        mk = {'beta': beta, 'g2_alpha': gp ** alpha}
+
+        with open('output_public_key', 'wb') as f:
+            pickle.dump(pk, f)
+
+        with open('output_master_key', 'wb') as f:
+            pickle.dump(mk, f)
     
     @Input(pk_t, mk_t, [str])
     @Output(sk_t)
