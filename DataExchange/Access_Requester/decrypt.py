@@ -75,7 +75,7 @@ def decrypt_key(encrypted_key_path, priv_key_name, cpabe_path, pub_key_path):
 # Define paths
 oldkey_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Data_Owner"
 cpabe_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/cpabe-0.11"
-base_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Access Requester"
+base_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Access_Requester"
 pub_key_path = os.path.join(oldkey_path, "pub_key")
 master_key_path = os.path.join(oldkey_path, "master_key")
 priv_key_dir = os.path.join(base_path, "cpabe_keys")
