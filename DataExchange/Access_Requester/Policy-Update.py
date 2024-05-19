@@ -78,7 +78,7 @@ def encrypt_key(key, policy):
         cpabe_enc_path = os.path.join(cpabe_path, 'cpabe-enc')
         encrypted_key_path = os.path.join(priv_key_dir, "reencrypted_key.cpabe")
         result = subprocess.run(
-            [cpabe_enc_path, '-k', pub_key_path, temp_key_file.name, policy, '-o', encrypted_key_path],
+            [cpabe_enc_path, pub_key_path, temp_key_file.name, policy, '-o', encrypted_key_path],
             capture_output=True,
             text=True
         )
@@ -118,16 +118,6 @@ def main():
         stop_time = timeit.default_timer()
         decryption_time = stop_time - start_time
 
-        decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_key)
-
-        with open(decrypted_file_path, "rb") as file:
-            with open(f"decrypted_{index}.pdf", "wb") as decrypted:
-                decrypted.write(file.read())
-
-        with open(f"decrypted_{index}.pdf", "rb") as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            print(f"PDF {index} metadata:", pdf_reader.metadata)
-
         # Use a fixed policy that matches the attributes
         new_policy = "(admin and it_department) or (developer and finance)"
         start_reenc_time = timeit.default_timer()
@@ -142,6 +132,16 @@ def main():
         decrypted_reencrypted_key = decrypt_key(re_encrypted_key, new_priv_name)
         stop_redec_time = timeit.default_timer()
         redecryption_time = stop_redec_time - start_redec_time
+        
+        decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_reencrypted_key)
+
+        with open(decrypted_file_path, "rb") as file:
+            with open(f"decrypted_{index}.pdf", "wb") as decrypted:
+                decrypted.write(file.read())
+
+        with open(f"decrypted_{index}.pdf", "rb") as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            print(f"PDF {index} metadata:", pdf_reader.metadata)
 
         # Accumulate the total re-encryption time
         reencryption_total_time += (decryption_time + reenc_time + redecryption_time)

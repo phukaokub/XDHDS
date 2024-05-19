@@ -90,12 +90,17 @@ def encrypt_key(key, policy):
         encrypted_key = base64.b64encode(f.read()).decode("utf-8")
     return encrypted_key
 
-def reencrypt_entry(entry):
+def reencrypt_entry(entry, reencryption_total_time):
     encrypted_content_base64 = entry["files"][0]["CT_1"]
     encrypted_key_base64 = entry["files"][0]["CT_2"]
 
     start_time = timeit.default_timer()
-    decrypted_key = decrypt_key(encrypted_key_base64, priv_name)
+    try:
+        decrypted_key = decrypt_key(encrypted_key_base64, priv_name)
+    except subprocess.CalledProcessError as e:
+        print(f"Error decrypting key: {e}")
+        return
+
     stop_time = timeit.default_timer()
     decryption_time = stop_time - start_time
 
@@ -126,55 +131,54 @@ def reencrypt_entry(entry):
 
     # Accumulate the total re-encryption time
     reencryption_total_time += (decryption_time + reenc_time + redecryption_time)
+    # Print re-encryption time for the current entry
+    print(f"Re-encryption Time for entry {index}: {reencryption_total_time} seconds")
 
-    print(f"Re-encryption Time for entry {index}: {reencryption_time} seconds")
+    return reencryption_total_time  # Return the updated total re-encryption time
 
-def main():
-    # Start recording the total time
-    total_start_time = timeit.default_timer()
 
-    # Download data.json from GCS before processing
-    download_start_time = timeit.default_timer()
-    download_data_from_gcs(bucket_name, object_name, local_data_path)
-    download_stop_time = timeit.default_timer()
-    download_time = download_stop_time - download_start_time
+# Start recording the total time
+total_start_time = timeit.default_timer()
 
-    with open(local_data_path, "r") as file:
-        data = json.load(file)
+# Download data.json from GCS before processing
+download_start_time = timeit.default_timer()
+download_data_from_gcs(bucket_name, object_name, local_data_path)
+download_stop_time = timeit.default_timer()
+download_time = download_stop_time - download_start_time
 
-    attributes = ['developer', 'it_department']
-    priv_name = 'AR_priv'
-    generate_private_key(attributes, priv_name)
+with open(local_data_path, "r") as file:
+    data = json.load(file)
 
-    reencryption_total_time = 0  # Total re-encryption time
+attributes = ['developer', 'it_department']
+priv_name = 'AR_priv'
+generate_private_key(attributes, priv_name)
 
-    print("Select an option:")
-    print("1. Perform re-encryption sequentially")
-    print("2. Perform re-encryption in parallel")
+reencryption_total_time = 0  # Initialize total re-encryption time
 
-    choice = input("Enter your choice: ")
+print("Select an option:")
+print("1. Perform re-encryption sequentially")
+print("2. Perform re-encryption in parallel")
 
-    if choice == "1":
-        for index, entry in enumerate(data[:20]):
-            reencrypt_entry(entry)
-    elif choice == "2":
-        # Start re-encryption in parallel
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            futures = [executor.submit(reencrypt_entry, entry) for entry in data[:20]]
-            for future in concurrent.futures.as_completed(futures):
-                future.result()
-    else:
-        print("Invalid choice. Please enter 1 or 2.")
+choice = input("Enter your choice: ")
 
-    # Print total re-encryption time
-    print(f"Total Re-encryption Time: {reencryption_total_time} seconds")
+if choice == "1":
+    for index, entry in enumerate(data[:20]):
+        reencryption_total_time = reencrypt_entry(entry, reencryption_total_time)
+elif choice == "2":
+    # Start re-encryption in parallel
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = [executor.submit(reencrypt_entry, entry, reencryption_total_time) for entry in data[:20]]
+        for future in concurrent.futures.as_completed(futures):
+            reencryption_total_time = future.result()
+else:
+    print("Invalid choice. Please enter 1 or 2.")
 
-    # Stop recording the total time
-    total_stop_time = timeit.default_timer()
-    total_time = total_stop_time - total_start_time
+# Print total re-encryption time
+print(f"Total Re-encryption Time: {reencryption_total_time} seconds")
 
-    # Print total time
-    print(f"Total Time: {total_time} seconds")
+# Stop recording the total time
+total_stop_time = timeit.default_timer()
+total_time = total_stop_time - total_start_time
 
-if __name__ == "__main__":
-    main()
+# Print total time
+print(f"Total Time: {total_time} seconds")
