@@ -7,33 +7,33 @@ import tempfile
 import base64
 
 def download_data_from_gcs(bucket_name, object_name, local_file_path):
-    """Downloads a file from Google Cloud Storage.
+  """Downloads a file from Google Cloud Storage.
 
-    Args:
-        bucket_name: The name of the bucket containing the file.
-        object_name: The name of the file to download.
-        local_file_path: The path to save the downloaded file locally.
-    """
-    # Import the Google Cloud Storage library (assuming it's not already imported)
-    from google.cloud import storage
+  Args:
+      bucket_name: The name of the bucket containing the file.
+      object_name: The name of the file to download.
+      local_file_path: The path to save the downloaded file locally.
+  """
+  # Import the Google Cloud Storage library (assuming it's not already imported)
+  from google.cloud import storage
 
-    # Create a storage client
-    client = storage.Client()
+  # Create a storage client
+  client = storage.Client()
 
-    # Get a reference to the bucket
-    bucket = client.bucket(bucket_name)
+  # Get a reference to the bucket
+  bucket = client.bucket(bucket_name)
 
-    # Get a reference to the object (file)
-    blob = bucket.blob(object_name)
+  # Get a reference to the object (file)
+  blob = bucket.blob(object_name)
 
-    # Download the object to the local file
-    blob.download_to_filename(local_file_path)
-
+  # Download the object to the local file
+  blob.download_to_filename(local_file_path)
+  
 def decrypt_file(encrypted_file_path, key):
-    f = Fernet(key)
 
+    f = Fernet(key)
     # Decode the base64-encoded encrypted contents to bytes
-    encrypted_content = base64.b64decode(encrypted_file_path.encode())
+    encrypted_content = base64.b64decode(encrypted_content_base64.encode())
 
     # Decrypt the contents
     decrypted_content = f.decrypt(encrypted_content)
@@ -43,38 +43,58 @@ def decrypt_file(encrypted_file_path, key):
         file.write(decrypted_content)
         file.flush()
 
+
         # Open the temporary file and return the file path
         return file.name
 
-# Function to generate the private key using cpabe-keygen
 def generate_private_key(attributes, priv_name):
-    priv_key_path = os.path.join(priv_key_dir, priv_name)
-    cpabe_keygen_path = os.path.join(cpabe_path, 'cpabe-keygen')
-    subprocess.run([cpabe_keygen_path, '-o', priv_key_path, pub_key_path, master_key_path] + attributes, check=True)
 
-    # Read the private key from the file
-    with open(priv_key_path, "rb") as f:
-        private_key = base64.b64encode(f.read()).decode("utf-8")
+    # Run the cpabe-keygen command in the Docker container
+    try:
+        subprocess.run(["docker", "exec", "cp-abe", "cpabe-keygen", "-o", priv_name, "pub_key", "master_key", attributes[0], attributes[1]])
+
+        # Copy the private key file from the Docker container to the host machine
+        private_key_path = os.path.join(cpabe_keys_dir, priv_name)
+        subprocess.run(["docker", "cp", f"{container_id}:/root/{priv_name}", private_key_path])
+
+        # Read the private key from the file
+        with open(private_key_path, "rb") as f:
+            private_key = f.read()
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error running cpabe-keygen: {e.stderr.decode()}")
+
+        private_key = None
 
     return private_key
 
-def decrypt_key(encrypted_key_path, priv_key_path, cpabe_path, pub_key_path):
-    cpabe_dec_path = os.path.join(cpabe_path, 'cpabe-dec')
-    decrypted_key_path = os.path.join(cpabe_path, "decrypted_key")
-    subprocess.run([cpabe_dec_path, '-k', pub_key_path, priv_key_path, encrypted_key_path, '-o', decrypted_key_path], check=True)
+def decrypt_key(encrypted_key_path, priv_name):
+    # Copy the encrypted key file from the host machine to the Docker container
+    encrypted_key_name = os.path.basename(encrypted_key_path)
+    subprocess.run(["docker", "cp", encrypted_key_path, f"{container_id}:/root/encrypted_key.cpabe"])
 
-    # Read the decrypted key from the file
-    with open(decrypted_key_path, "rb") as f:
-        decrypted_key = f.read()
+    # Run the cpabe-keygen command in the Docker container
+    try:
+        subprocess.run(["docker", "exec", "cp-abe", "cpabe-dec", "pub_key", priv_name, "encrypted_key.cpabe"])
+
+        # Copy the private key file from the Docker container to the host machine
+        decrypted_key_path = os.path.join(cpabe_keys_dir, "decrypted_key")
+        subprocess.run(["docker", "cp", f"{container_id}:/root/encrypted_key", decrypted_key_path])
+
+        # Read the decrypted key from the file
+        with open(decrypted_key_path, "rb") as f:
+            decrypted_key = f.read()
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error running cpabe-keygen: {e.stderr.decode()}")
+
+        decrypted_key = None
 
     return decrypted_key
 
-# Define paths
-base_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Access Requester"
-cpabe_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/cpabe-0.11"
-pub_key_path = os.path.join(cpabe_path, "pub_key")
-master_key_path = os.path.join(cpabe_path, "master_key")
-priv_key_dir = os.path.join(base_path, "cpabe_keys")
+python_file_path = os.path.abspath(__file__)
+cpabe_keys_dir = os.path.join(os.path.dirname(python_file_path), "cpabe_keys")
+container_id = subprocess.run(["docker", "ps", "-q"], capture_output=True, text=True).stdout.strip()
 
 # Download data.json from GCS before processing
 bucket_name = "hospital-a"  # Replace with your bucket name
@@ -88,7 +108,7 @@ with open(local_data_path, "r") as file:
     data = json.load(file)
 
 # Define the attributes required for decryption
-attributes = ['developer', 'it_department']
+attributes= ['developer' , 'it_department']
 
 # Generate the private key for the attributes
 priv_name = 'AR_priv'
@@ -96,12 +116,11 @@ private_key = generate_private_key(attributes, priv_name)
 
 encrypted_content_base64 = data["files"][0]["CT_1"]
 encrypted_key_path = data["files"][0]["CT_2"]
-decrypted_key = decrypt_key(encrypted_key_path, priv_name, cpabe_path, pub_key_path)
-key = decrypted_key
+key = decrypt_key(encrypted_key_path, priv_name)
 print("AES key: ", key)
 
 # Decrypt the PDF file
-decrypted_file_path = decrypt_file(encrypted_content_base64, key)
+decrypted_file_path = decrypt_file(encrypted_content_base64, key.decode())
 
 # Save the decrypted PDF file to the local machine
 with open(decrypted_file_path, "rb") as file:

@@ -7,11 +7,11 @@ from cryptography.fernet import Fernet
 from google.cloud import storage
 
 # Define paths
-base_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange"
+base_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Data_Owner"
 pub_key_path = os.path.join(base_path, "pub_key")
 master_key_path = os.path.join(base_path, "master_key")
-symkey_dir = os.path.join(base_path, "Data_Owner/Symkeys")
-priv_key_dir = os.path.join(base_path, "Data_Owner/cpabe_keys")
+symkey_dir = os.path.join(base_path, "Symkeys")
+priv_key_dir = os.path.join(base_path, "cpabe_keys")
 cpabe_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/cpabe-0.11"
 
 # Function to generate a symmetric key
@@ -63,12 +63,8 @@ def encrypt_key(key, policy):
         temp_key_file.flush()
 
         cpabe_enc_path = os.path.join(cpabe_path, 'cpabe-enc')
-        encrypted_key_filename = "encrypted_key.cpabe"
-        encrypted_key_path = os.path.join(priv_key_dir, encrypted_key_filename)
+        encrypted_key_path = temp_key_file.name + '.cpabe'
         subprocess.run([cpabe_enc_path, '-k', pub_key_path, temp_key_file.name, policy, '-o', encrypted_key_path], check=True)
-
-        # Remove the temporary file
-        os.remove(temp_key_file.name)
 
     return encrypted_key_path
 
