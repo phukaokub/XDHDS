@@ -7,8 +7,9 @@ import tempfile
 import base64
 import timeit
 from google.cloud import storage
-import concurrent.futures
-from math import ceil
+# import concurrent.futures
+import multiprocessing
+from math import ceil, floor
 
 # Define paths
 oldkey_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Data_Owner"
@@ -115,16 +116,16 @@ def encrypt_key(key, policy, priv_name):
         encrypted_key = base64.b64encode(f.read()).decode("utf-8")
     return encrypted_key
 
-def reencrypt_entry(entry, reencryption_total_time, proxy_id, index):
+def reencrypt_entry(entry, reencryption_total_time, proxy_id=None, index=None, return_dict=None):
     # Decrypt the key by proxy
     encrypted_content_base64 = entry["files"][0]["CT_1"]
     encrypted_key_base64 = entry["files"][0]["CT_2"]
 
     start_time = timeit.default_timer()
     try:
-        decrypted_key = decrypt_key(encrypted_key_base64, priv_name, index)
+        decrypted_key = decrypt_key(encrypted_key_base64, priv_name, index if index is not None else proxy_id)
     except subprocess.CalledProcessError as e:
-        print(f"Error decrypting key 130 {index+proxy_id*chunk_size}: {e}")
+        print(f"Error decrypting key 130 {index if index is not None else proxy_id}: {e}")
         return
 
     stop_time = timeit.default_timer()
@@ -132,10 +133,8 @@ def reencrypt_entry(entry, reencryption_total_time, proxy_id, index):
 
     # Use a random AR policy that matches the attributes
     start_reenc_time = timeit.default_timer()
-    
-    print("proxy id: ", proxy_id, "Index: ", index)
-    
-    new_priv_name = 'AR_repriv'+str(proxy_id*chunk_size+index)
+    print("proxy id: ", proxy_id if proxy_id is not None else "N/A", "Index: ", index if index is not None else "N/A")
+    new_priv_name = 'AR_repriv' + str((proxy_id if proxy_id is not None else 0) * chunk_size + (index if index is not None else 0))
     new_attributes = ['admin', 'it_department']
     generate_private_key(new_attributes, new_priv_name)
     new_policy = "(admin and it_department) or (developer and finance)"
@@ -144,25 +143,29 @@ def reencrypt_entry(entry, reencryption_total_time, proxy_id, index):
 
     # Decrypt the file by decrypted reencrypted key
     decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_key)
-    
+
     with open(decrypted_file_path, "rb") as file:
-        with open(f"decrypted_{index}.pdf", "wb") as decrypted:
+        with open(f"decrypted_{index if index is not None else proxy_id}.pdf", "wb") as decrypted:
             decrypted.write(file.read())
 
     with open(decrypted_file_path, "rb") as decrypted:
         pdf_reader = PyPDF2.PdfReader(decrypted)
-        print(f"PDF {index} metadata:", pdf_reader.metadata)
-        
+        print(f"PDF {index if index is not None else proxy_id} metadata:", pdf_reader.metadata)
+
     stop_reenc_time = timeit.default_timer()
     reenc_time = stop_reenc_time - start_reenc_time
-    
+
     # Accumulate the total re-encryption time
     reencryption_total_time += (decryption_time + reenc_time)
-    
+
     # Print re-encryption time for the current entry
-    print(f"Re-encryption Time for entry {index}: {reencryption_total_time} seconds")
+    print(f"Re-encryption Time for entry {index if index is not None else proxy_id}: {reencryption_total_time} seconds")
+
+    if return_dict is not None:
+        return_dict[index if index is not None else proxy_id] = reencryption_total_time
 
     return reencryption_total_time
+
 
 # Start recording the total time
 total_start_time = timeit.default_timer()
@@ -175,7 +178,7 @@ download_time = download_stop_time - download_start_time
 
 with open(local_data_path, "r") as file:
     data = json.load(file)
-
+    
 attributes = ['developer', 'it_department']
 priv_name = 'Proxy'
 generate_private_key(attributes, priv_name)
@@ -188,28 +191,34 @@ print("2. Perform re-encryption in parallel")
 
 choice = input("Enter your choice: ")
 data_num = len(data)
-proxy_num = 5
-chunk_size = ceil(data_num / proxy_num)
+proxy_num = 2
+chunk_size = floor(data_num / proxy_num)
 
 if choice == "1":
     for index, entry in enumerate(data[:data_num]):
-        reencryption_total_time = reencrypt_entry(entry, reencryption_total_time, None, index)
+        reencryption_total_time = reencrypt_entry(entry, reencryption_total_time, None, index, None)
 
 elif choice == "2":
     # Split the data into 5 chunks
     chunks = [data[:data_num][i:i+chunk_size] for i in range(0, len(data[:data_num]), chunk_size)]
 
-    # Create a list of futures
-    futures = []
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        for proxy_id, chunk in enumerate(chunks):
-            for index, entry in enumerate(chunk):
-                futures.append(executor.submit(reencrypt_entry, entry, reencryption_total_time, proxy_id, index+proxy_id*chunk_size))
-                print(f"Re-encryption task for entry {index+proxy_id*chunk_size} in proxy {proxy_id} submitted")
+    processes = []
+    manager = multiprocessing.Manager()
+    return_dict = manager.dict()
+
+    for proxy_id, chunk in enumerate(chunks):
+        for index, entry in enumerate(chunk):
+            p = multiprocessing.Process(target=reencrypt_entry, args=(entry, reencryption_total_time, proxy_id, index + proxy_id * chunk_size, return_dict))
+            processes.append(p)
+            p.start()
+            print(f"Re-encryption task for entry {index + proxy_id * chunk_size} in proxy {proxy_id} started")
+
+    for p in processes:
+        p.join()
 
     # Collect the results
-    for future in concurrent.futures.as_completed(futures):
-        reencryption_total_time = future.result()
+    for index, result in return_dict.items():
+        reencryption_total_time = result
 
 else:
     print("Invalid choice. Please enter 1 or 2.")

@@ -85,7 +85,6 @@ bucket_name = "hospital-a"  # Replace with your bucket name
 object_name = "data.json"
 local_data_path = "data.json"  # Path to save downloaded data.json locally
 
-
 download_data_from_gcs(bucket_name, object_name, local_data_path)
 
 # Load the symmetric key and encrypted file from the downloaded data.json
