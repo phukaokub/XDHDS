@@ -7,6 +7,7 @@ import tempfile
 import base64
 import timeit
 from google.cloud import storage
+import concurrent.futures
 
 # Define paths
 oldkey_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Data_Owner"
@@ -89,6 +90,45 @@ def encrypt_key(key, policy):
         encrypted_key = base64.b64encode(f.read()).decode("utf-8")
     return encrypted_key
 
+def reencrypt_entry(entry):
+    encrypted_content_base64 = entry["files"][0]["CT_1"]
+    encrypted_key_base64 = entry["files"][0]["CT_2"]
+
+    start_time = timeit.default_timer()
+    decrypted_key = decrypt_key(encrypted_key_base64, priv_name)
+    stop_time = timeit.default_timer()
+    decryption_time = stop_time - start_time
+
+    decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_key)
+
+    with open(decrypted_file_path, "rb") as file:
+        with open(f"decrypted_{index}.pdf", "wb") as decrypted:
+            decrypted.write(file.read())
+
+    with open(f"decrypted_{index}.pdf", "rb") as file:
+        pdf_reader = PyPDF2.PdfReader(file)
+        print(f"PDF {index} metadata:", pdf_reader.metadata)
+
+    # Use a fixed policy that matches the attributes
+    new_policy = "(admin and it_department) or (developer and finance)"
+    start_reenc_time = timeit.default_timer()
+    re_encrypted_key = encrypt_key(decrypted_key, new_policy)
+    stop_reenc_time = timeit.default_timer()
+    reenc_time = stop_reenc_time - start_reenc_time
+
+    new_priv_name = 'AR_repriv'
+    new_attributes = ['admin', 'it_department']
+    generate_private_key(new_attributes, new_priv_name)
+    start_redec_time = timeit.default_timer()
+    decrypted_reencrypted_key = decrypt_key(re_encrypted_key, new_priv_name)
+    stop_redec_time = timeit.default_timer()
+    redecryption_time = stop_redec_time - start_redec_time
+
+    # Accumulate the total re-encryption time
+    reencryption_total_time += (decryption_time + reenc_time + redecryption_time)
+
+    print(f"Re-encryption Time for entry {index}: {reencryption_time} seconds")
+
 def main():
     # Start recording the total time
     total_start_time = timeit.default_timer()
@@ -108,50 +148,33 @@ def main():
 
     reencryption_total_time = 0  # Total re-encryption time
 
+    print("Select an option:")
+    print("1. Perform re-encryption sequentially")
+    print("2. Perform re-encryption in parallel")
 
-    for index, entry in enumerate(data[:20]):
-        encrypted_content_base64 = entry["files"][0]["CT_1"]
-        encrypted_key_base64 = entry["files"][0]["CT_2"]
+    choice = input("Enter your choice: ")
 
-        start_time = timeit.default_timer()
-        decrypted_key = decrypt_key(encrypted_key_base64, priv_name)
-        stop_time = timeit.default_timer()
-        decryption_time = stop_time - start_time
+    if choice == "1":
+        for index, entry in enumerate(data[:20]):
+            reencrypt_entry(entry)
+    elif choice == "2":
+        # Start re-encryption in parallel
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            futures = [executor.submit(reencrypt_entry, entry) for entry in data[:20]]
+            for future in concurrent.futures.as_completed(futures):
+                future.result()
+    else:
+        print("Invalid choice. Please enter 1 or 2.")
 
-        decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_key)
-
-        with open(decrypted_file_path, "rb") as file:
-            with open(f"decrypted_{index}.pdf", "wb") as decrypted:
-                decrypted.write(file.read())
-
-        with open(f"decrypted_{index}.pdf", "rb") as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            print(f"PDF {index} metadata:", pdf_reader.metadata)
-
-        # Use a fixed policy that matches the attributes
-        new_policy = "(admin and it_department) or (developer and finance)"
-        start_reenc_time = timeit.default_timer()
-        re_encrypted_key = encrypt_key(decrypted_key, new_policy)
-        stop_reenc_time = timeit.default_timer()
-        reenc_time = stop_reenc_time - start_reenc_time
-
-        new_priv_name = 'AR_repriv'
-        new_attributes = ['admin', 'it_department']
-        generate_private_key(new_attributes, new_priv_name)
-        start_redec_time = timeit.default_timer()
-        decrypted_reencrypted_key = decrypt_key(re_encrypted_key, new_priv_name)
-        stop_redec_time = timeit.default_timer()
-        redecryption_time = stop_redec_time - start_redec_time
-
-        # Accumulate the total re-encryption time
-        reencryption_total_time += (decryption_time + reenc_time + redecryption_time)
+    # Print total re-encryption time
+    print(f"Total Re-encryption Time: {reencryption_total_time} seconds")
 
     # Stop recording the total time
     total_stop_time = timeit.default_timer()
     total_time = total_stop_time - total_start_time
 
     # Print total time
-    print(f"Total Re-encryption Time: Download time {download_time} + Re-encrypt {reencryption_total_time} = {total_time} seconds")
+    print(f"Total Time: {total_time} seconds")
 
 if __name__ == "__main__":
     main()
