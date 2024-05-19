@@ -11,8 +11,8 @@ def utf8len(s):
 def main():
 
    rv1name = "test1"
-   numberOfPolicy = 20;
-   dataSizeInKb = 1000;
+   numberOfPolicy = 20
+   dataSizeInKb = 1000
 
    policy = createPolicy(numberOfPolicy)
 

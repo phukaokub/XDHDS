@@ -5,6 +5,7 @@ import tempfile
 import base64
 from cryptography.fernet import Fernet
 from google.cloud import storage
+import timeit
 
 # Define paths
 base_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Data_Owner"
@@ -98,9 +99,9 @@ def upload_to_gcs(bucket_name, source_file_path, destination_blob_name):
 
 # Encrypt a PDF file and save the symmetric key in a JSON file
 pdf_file_path = "EHR_Template.pdf"
+start_DO_time = timeit.default_timer()
 key = generate_key()
-print("AES key: ", key.decode())
-encrypted_content = encrypt_file(pdf_file_path, key)
+encrypted_content = encrypt_file(pdf_file_path, key) #Symmetric Encryption
 
 # Generate the public key and master key using cpabe-setup
 setup_cpabe()
@@ -137,3 +138,8 @@ with open("data.json", "w") as file:
 # Upload data.json to Google Cloud Storage
 bucket_name = "hospital-a"
 upload_to_gcs(bucket_name, "data.json", "data.json")
+
+stop_DO_time = timeit.default_timer()
+
+sym_time = stop_DO_time - start_DO_time #Timer
+print("Data Owner storing file Time: " + str(sym_time)) 

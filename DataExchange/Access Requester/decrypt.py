@@ -70,6 +70,8 @@ def decrypt_key(encrypted_key_path, priv_key_name, cpabe_path, pub_key_path):
 
     return decrypted_key
 
+##############################################################################################################################
+
 # Define paths
 oldkey_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Data_Owner"
 cpabe_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/cpabe-0.11"
@@ -82,6 +84,7 @@ priv_key_dir = os.path.join(base_path, "cpabe_keys")
 bucket_name = "hospital-a"  # Replace with your bucket name
 object_name = "data.json"
 local_data_path = "data.json"  # Path to save downloaded data.json locally
+
 
 download_data_from_gcs(bucket_name, object_name, local_data_path)
 
@@ -115,3 +118,7 @@ with open(decrypted_file_path, "rb") as file:
 with open("decrypted.pdf", "rb") as file:
     pdf_reader = PyPDF2.PdfReader(file)
     print(pdf_reader.metadata)
+    
+    
+# cpabe_time = stop_cpabe_time - start_cpabe_time #Timer
+# print("ReEnc Time: " + str(cpabe_time))
