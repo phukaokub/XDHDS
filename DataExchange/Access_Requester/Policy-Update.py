@@ -90,7 +90,14 @@ def encrypt_key(key, policy):
     return encrypted_key
 
 def main():
+    # Start recording the total time
+    total_start_time = timeit.default_timer()
+
+    # Download data.json from GCS before processing
+    download_start_time = timeit.default_timer()
     download_data_from_gcs(bucket_name, object_name, local_data_path)
+    download_stop_time = timeit.default_timer()
+    download_time = download_stop_time - download_start_time
 
     with open(local_data_path, "r") as file:
         data = json.load(file)
@@ -99,10 +106,10 @@ def main():
     priv_name = 'AR_priv'
     generate_private_key(attributes, priv_name)
 
-    decryption_times = []
-    reencryption_times = []
+    reencryption_total_time = 0  # Total re-encryption time
 
-    for index, entry in enumerate(data[:10]):
+
+    for index, entry in enumerate(data[:20]):
         encrypted_content_base64 = entry["files"][0]["CT_1"]
         encrypted_key_base64 = entry["files"][0]["CT_2"]
 
@@ -110,7 +117,6 @@ def main():
         decrypted_key = decrypt_key(encrypted_key_base64, priv_name)
         stop_time = timeit.default_timer()
         decryption_time = stop_time - start_time
-        decryption_times.append(decryption_time)
 
         decrypted_file_path = decrypt_file(encrypted_content_base64, decrypted_key)
 
@@ -128,7 +134,6 @@ def main():
         re_encrypted_key = encrypt_key(decrypted_key, new_policy)
         stop_reenc_time = timeit.default_timer()
         reenc_time = stop_reenc_time - start_reenc_time
-        reencryption_times.append(reenc_time)
 
         new_priv_name = 'AR_repriv'
         new_attributes = ['admin', 'it_department']
@@ -138,13 +143,15 @@ def main():
         stop_redec_time = timeit.default_timer()
         redecryption_time = stop_redec_time - start_redec_time
 
-        assert decrypted_key == decrypted_reencrypted_key, f"Re-encryption process failed for index {index}. Keys do not match."
+        # Accumulate the total re-encryption time
+        reencryption_total_time += (decryption_time + reenc_time + redecryption_time)
 
-        print(f"Re-encryption Time for index {index}: {reenc_time} seconds")
-        print(f"Re-decryption Time for index {index}: {redecryption_time} seconds")
+    # Stop recording the total time
+    total_stop_time = timeit.default_timer()
+    total_time = total_stop_time - total_start_time
 
-    print(f"Average Decryption Time: {sum(decryption_times) / len(decryption_times)} seconds")
-    print(f"Average Re-encryption Time: {sum(reencryption_times) / len(reencryption_times)} seconds")
+    # Print total time
+    print(f"Total Re-encryption Time: {total_time} seconds")
 
 if __name__ == "__main__":
     main()

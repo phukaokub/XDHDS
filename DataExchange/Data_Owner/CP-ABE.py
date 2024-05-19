@@ -11,7 +11,6 @@ import timeit
 base_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Data_Owner"
 pub_key_path = os.path.join(base_path, "pub_key")
 master_key_path = os.path.join(base_path, "master_key")
-# symkey_dir = os.path.join(base_path, "Symkeys")
 priv_key_dir = os.path.join(base_path, "cpabe_keys")
 cpabe_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/cpabe-0.11"
 
