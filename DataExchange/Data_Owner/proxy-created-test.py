@@ -76,7 +76,7 @@ setup_cpabe()
 # Initialize a list to hold all data entries
 data_entries = []
 
-for i in range(1, 21):
+for i in range(1, 101):
     attributes = ['admin', 'it_department']
     priv_name = f'DO_priv_{i}'
     private_key = generate_private_key(attributes, priv_name)

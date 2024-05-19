@@ -162,13 +162,13 @@ print("2. Perform re-encryption in parallel")
 choice = input("Enter your choice: ")
 
 if choice == "1":
-    for index, entry in enumerate(data[:20]):
+    for index, entry in enumerate(data[:100]):
         reencryption_total_time = reencrypt_entry(entry, reencryption_total_time, None, index)
 
 elif choice == "2":
     # Split the data into 5 chunks
-    chunk_size = ceil(len(data[:20]) / 5)
-    chunks = [data[:20][i:i+chunk_size] for i in range(0, len(data[:20]), chunk_size)]
+    chunk_size = ceil(len(data[:100]) / 20)
+    chunks = [data[:100][i:i+chunk_size] for i in range(0, len(data[:100]), chunk_size)]
 
     # Create a list of futures
     futures = []
