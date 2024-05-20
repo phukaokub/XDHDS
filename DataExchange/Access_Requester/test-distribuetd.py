@@ -9,7 +9,7 @@ import timeit
 from google.cloud import storage
 # import concurrent.futures
 import multiprocessing
-from math import ceil, floor
+from math import floor
 
 # Define paths
 oldkey_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Data_Owner"
@@ -57,14 +57,11 @@ def generate_private_key(attributes, priv_name):
 
 def decrypt_key(encrypted_key_base64, priv_key_name, index):
     cpabe_dec_path = os.path.join(cpabe_path, 'cpabe-dec')
-    encrypted_key_path = os.path.join(priv_key_dir, "encrypted_key.cpabe")
-    with open(encrypted_key_path, "wb") as f:
-        f.write(base64.b64decode(encrypted_key_base64))
     decrypted_key_name = str(index) + "decrypted_key"
     decrypted_key_path = os.path.join(base_path, decrypted_key_name)
     priv_key_path = os.path.join(priv_key_dir, priv_key_name)
     result = subprocess.run(
-        [cpabe_dec_path, pub_key_path, priv_key_path, encrypted_key_path, '-o', decrypted_key_path, '-k'],
+        [cpabe_dec_path, pub_key_path, priv_key_path, encrypted_key_base64, '-o', decrypted_key_path],
         capture_output=True,
         text=True
     )
@@ -86,7 +83,7 @@ def redecrypt_key(encrypted_key_base64, repriv_key_name):
     decrypted_key_path = os.path.join(base_path, "redecrypted_key")
     priv_key_path = os.path.join(priv_key_dir, repriv_key_name)
     result = subprocess.run(
-        [cpabe_dec_path, pub_key_path, priv_key_path, encrypted_key_path, '-o', decrypted_key_path, '-k'],
+        [cpabe_dec_path, pub_key_path, priv_key_path, encrypted_key_path, '-o', decrypted_key_path],
         capture_output=True,
         text=True
     )
@@ -105,7 +102,7 @@ def encrypt_key(key, policy, priv_name):
         encrypted_key_name = priv_name + "reencrypted_key.cpabe"
         encrypted_key_path = os.path.join(priv_key_dir, encrypted_key_name)
         result = subprocess.run(
-            [cpabe_enc_path, '-k', pub_key_path, temp_key_file.name, policy, '-o', encrypted_key_path],
+            [cpabe_enc_path, pub_key_path, temp_key_file.name, policy, '-o', encrypted_key_path],
             capture_output=True,
             text=True
         )
@@ -120,10 +117,18 @@ def reencrypt_entry(entry, reencryption_total_time, proxy_id=None, index=None, r
     # Decrypt the key by proxy
     encrypted_content_base64 = entry["files"][0]["CT_1"]
     encrypted_key_base64 = entry["files"][0]["CT_2"]
+    
+    # Decode the base64 string
+    encrypted_key_bytes = base64.b64decode(encrypted_key_base64)
+
+    # Create the .cpabe file
+    filename = f"encrypted_{index if index is not None else proxy_id}.cpabe"
+    with open(filename, "wb") as decrypted:
+        decrypted.write(encrypted_key_bytes)
 
     start_time = timeit.default_timer()
     try:
-        decrypted_key = decrypt_key(encrypted_key_base64, priv_name, index if index is not None else proxy_id)
+        decrypted_key = decrypt_key(filename, priv_name, index if index is not None else proxy_id)
     except subprocess.CalledProcessError as e:
         print(f"Error decrypting key 130 {index if index is not None else proxy_id}: {e}")
         return
@@ -134,7 +139,7 @@ def reencrypt_entry(entry, reencryption_total_time, proxy_id=None, index=None, r
     # Use a random AR policy that matches the attributes
     start_reenc_time = timeit.default_timer()
     print("proxy id: ", proxy_id if proxy_id is not None else "N/A", "Index: ", index if index is not None else "N/A")
-    new_priv_name = 'AR_repriv' + str((proxy_id if proxy_id is not None else 0) * chunk_size + (index if index is not None else 0))
+    new_priv_name = 'AR_repriv' + str(index if index is not None else 0)
     new_attributes = ['admin', 'it_department']
     generate_private_key(new_attributes, new_priv_name)
     new_policy = "(admin and it_department) or (developer and finance)"
@@ -191,6 +196,7 @@ print("2. Perform re-encryption in parallel")
 
 choice = input("Enter your choice: ")
 data_num = len(data)
+# data_num = 20
 proxy_num = 2
 chunk_size = floor(data_num / proxy_num)
 
