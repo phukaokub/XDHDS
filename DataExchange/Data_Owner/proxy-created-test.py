@@ -76,7 +76,7 @@ setup_cpabe()
 # Initialize a list to hold all data entries
 data_entries = []
 
-for i in range(1, 101):
+for i in range(1, 1001):
     attributes = ['admin', 'it_department']
     priv_name = f'DO_priv_{i}'
     private_key = generate_private_key(attributes, priv_name)
@@ -91,13 +91,14 @@ for i in range(1, 101):
         "DID": f"00{i:02d}",
         "files": [file_data]
     }
+    print(i)
     data_entries.append(data_entry)
 
 with open("proxy-test.json", "w") as file:
     json.dump(data_entries, file, indent=4)
 
 bucket_name = "hospital-a"
-upload_to_gcs(bucket_name, "proxy-test.json", "proxy-test.json")
+# upload_to_gcs(bucket_name, "proxy-test.json", "proxy-test.json")
 
 stop_DO_time = timeit.default_timer()
 sym_time = stop_DO_time - start_DO_time

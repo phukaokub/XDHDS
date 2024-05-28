@@ -22,7 +22,8 @@ priv_key_dir = os.path.join(base_path, "cpabe_keys")
 # Download data.json from GCS before processing
 bucket_name = "hospital-a"
 object_name = "proxy-test.json"
-local_data_path = "proxy-test.json"
+# local_data_path = "proxy-test.json"
+local_data_path = "/home/phukaokk/SIIT Project/HDIMS/DataExchange/Data_Owner/proxy-test.json"
 
 def download_data_from_gcs(bucket_name, object_name, local_file_path):
     client = storage.Client()
@@ -58,7 +59,7 @@ def generate_private_key(attributes, priv_name):
 def decrypt_key(encrypted_key_base64, priv_key_name, index):
     cpabe_dec_path = os.path.join(cpabe_path, 'cpabe-dec')
     decrypted_key_name = str(index) + "decrypted_key"
-    decrypted_key_path = os.path.join(base_path, decrypted_key_name)
+    decrypted_key_path = os.path.join(priv_key_dir, decrypted_key_name)
     priv_key_path = os.path.join(priv_key_dir, priv_key_name)
     result = subprocess.run(
         [cpabe_dec_path, pub_key_path, priv_key_path, encrypted_key_base64, '-o', decrypted_key_path],
@@ -67,7 +68,6 @@ def decrypt_key(encrypted_key_base64, priv_key_name, index):
     )
     if result.returncode != 0:
         print(f"Error decrypting key 74 {index+proxy_id*chunk_size}: {result.stderr}")
-        print("+++++++++")
         raise subprocess.CalledProcessError(result.returncode, result.args, output=result.stdout, stderr=result.stderr)
     with open(decrypted_key_path, "rb") as f:
         decrypted_key = f.read()
@@ -173,11 +173,10 @@ def reencrypt_entry(entry, reencryption_total_time, proxy_id=None, index=None, r
 
 
 # Start recording the total time
-total_start_time = timeit.default_timer()
 
 # Download data.json from GCS before processing
 download_start_time = timeit.default_timer()
-download_data_from_gcs(bucket_name, object_name, local_data_path)
+# download_data_from_gcs(bucket_name, object_name, local_data_path)
 download_stop_time = timeit.default_timer()
 download_time = download_stop_time - download_start_time
 
@@ -196,9 +195,11 @@ print("2. Perform re-encryption in parallel")
 
 choice = input("Enter your choice: ")
 data_num = len(data)
-# data_num = 20
-proxy_num = 2
+# data_num = 10
+proxy_num = 4
 chunk_size = floor(data_num / proxy_num)
+
+total_start_time = timeit.default_timer()
 
 if choice == "1":
     for index, entry in enumerate(data[:data_num]):
@@ -237,4 +238,4 @@ total_stop_time = timeit.default_timer()
 total_time = total_stop_time - total_start_time
 
 # Print total time
-print(f"Total Time: {total_time} seconds")
+print(f"Total Time: {total_time} seconds: Download time {download_time} + Re-encrypt {reencryption_total_time}")
