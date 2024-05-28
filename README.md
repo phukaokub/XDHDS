@@ -1,6 +1,6 @@
-# HDIMS: Cross-Regional Blockchain-based Healthcare Decentralized Identity Management System
+# HDIAM: Cross-Regional Blockchain Based Healthcare Decentralized Identity and Access Management Using Self-Sovereign Identity and Attribute-Based Proxy Re-Encryption
 
-HDIMS is a secure and decentralized identity management system for healthcare, built on blockchain technology, Ciphertext-Policy Attribute-Based Encryption (CP-ABE), AES encryption, cloud storage, and proxy re-encryption. This project aims to provide a robust and privacy-preserving solution for managing and sharing electronic health records (EHRs) across multiple regions and healthcare providers.
+HDIAM is a secure and decentralized identity management system for healthcare, built on blockchain technology, Ciphertext-Policy Attribute-Based Encryption (CP-ABE), AES encryption, cloud storage, and proxy re-encryption. This project aims to provide a robust and privacy-preserving solution for managing and sharing electronic health records (EHRs) across multiple regions and healthcare providers.
 
 ## Features
 
