@@ -1,7 +1,3 @@
-Here's the revised version of your GitHub README based on the updated title and abstract:
-
----
-
 # XDHDS: Cross-Domain Healthcare Data Sharing Using Self-Sovereign Identity and Adaptive Proxy Re-Encryption
 
 XDHDS is a secure, decentralized model for managing and sharing healthcare data across multiple domains and regions. Built on blockchain technology, it integrates Self-Sovereign Identity (SSI) and Ciphertext-Policy Attribute-Based Encryption (CP-ABE) to provide robust, fine-grained access control. XDHDS enhances patient control over Electronic Health Records (EHRs) while ensuring secure, cross-regional data sharing. The system also supports distributed proxy re-encryption, allowing efficient handling of large datasets.
@@ -88,7 +84,3 @@ Email: 6422780088@siit.tu.ac.th
 3rd Teerawat Chuaphanngam  
 School of ICT, SIIT, Thammasat University  
 Email: 6422780054@siit.tu.ac.th
-
----
-
-This README should align with the new title, abstract, and folder structure provided. Let me know if you need any further adjustments!
